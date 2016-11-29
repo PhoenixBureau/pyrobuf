@@ -265,3 +265,4 @@ Second, Pyrobuf simply assumes that the schema being used for a given message
 is the same on the send and receive ends, so changing the type of a field on
 one end without changing it on the other may cause bugs; adding or removing
 fields will not break anything.
+
