@@ -1,0 +1,141 @@
+﻿@@grammar :: Protobuf
+@@keyword :: true false option message
+(*
+
+Grako EBNF grammar for Google's Protocol Buffers syntax 3.
+
+Use it to generate proto3_parser_base.py by e.g.:
+
+    python -m grako -o proto3_parser_base.py proto3.ebnf
+
+A careful read and comparison to the spec will show some deficiencies.
+
+*)
+
+dot = '.' ;
+letter = /[a-zA-Z]/ ; (* "A" … "Z" | "a" … "z" *)
+decimalDigit = /\d/ ; (* "0" … "9" *)
+octalDigit   = /[0-7]/ ; (* "0" … "7" *)
+hexDigit     = /[0-9A-Fa-f]/ ; (* "0" … "9" | "A" … "F" | "a" … "f" *)
+
+@name
+ident = /[a-zA-Z]\w*/ ; (* letter { letter | decimalDigit | '_' } *)
+fullIdent = (dot).{ident}+ ; (* ident { '.' ident } *)
+
+messageName = ident ;
+enumName = ident ;
+fieldName = ident ;
+oneofName = ident ;
+mapName = ident ;
+serviceName = ident ;
+rpcName = ident ;
+
+messageType = [ fully_qualified:dot ] { parts+:ident dot } name:messageName ;
+   enumType = [ fully_qualified:dot ] { parts+:ident dot } name:enumName ;
+
+intLit     = decimalLit | octalLit | hexLit ;
+decimalLit = /[1-9]\d*/ ; (* ( "1" … "9" ) { decimalDigit } *)
+octalLit   = /0[0-7]*/ ; (* "0" { octalDigit } *)
+hexLit     = /0[xX][0-9A-Fa-f]+/ ; (* "0" ( "x" | "X" ) hexDigit { hexDigit } *)
+floatLit = /-?\d+\.\d*/ | "inf" | "nan" ;
+boolLit = 'true' | 'false' ;
+
+quote = "'" | '"' ;
+strLit = ( /"(?:[^"\\]|\\.)*"/ | /'(?:[^'\\]|\\.)*'/ ) ;
+emptyStatement = ';' ;
+constant = fullIdent | intLit | floatLit | strLit | boolLit ;
+syntax = 'syntax' '=' ( '"proto3"' | "'proto3'" ) ';' ;
+import = "import" [ "weak" | "public" ] @:strLit ";" ;
+package = "package" @:fullIdent ";" ;
+
+option = "option" name:optionName "=" value:constant ";" ;
+optionName = ( a:ident | "(" a:fullIdent ")" ) { "." b+:ident } ;
+
+type = "double" | "float" | "int32" | "int64" | "uint32" | "uint64"
+      | "sint32" | "sint64" | "fixed32" | "fixed64" | "sfixed32" | "sfixed64"
+      | "bool" | "string" | "bytes" | messageType | enumType ;
+
+fieldNumber = intLit ;
+
+field = [ repeated:"repeated" ]
+        type_:type name:fieldName "=" number:fieldNumber
+        [ "[" options:fieldOptions "]" ] ";" ;
+
+fieldOptions = (',').{ fieldOption } ;
+fieldOption = name:optionName "=" value:constant ;
+
+enum = "enum" name:enumName body:enumBody ;
+enumBody = "{" @:{ option | enumField | emptyStatement } "}" ;
+enumField = name:ident "=" number:intLit [ "[" options:enumOptions "]" ] ";" ;
+enumValueOption = name:optionName "=" value:constant ;
+enumOptions = (',').{ enumValueOption } ;
+
+message = "message" name:messageName body:messageBody ;
+messageBody = "{" @:{ field | enum | message | option | emptyStatement } "}" ;
+
+(* messageBody = "{" { field | enum | message | option | oneof | mapField | reserved | emptyStatement } "}" *)
+
+proto = syntax @:{ import | package | option | topLevelDef | emptyStatement } ;
+topLevelDef = message | enum ;
+
+
+
+(*****************************************************
+
+This stuff is unimplemented as yet:
+
+
+
+	String literals
+
+	strLit = ( "'" { charValue } "'" ) |  ( '"' { charValue } '"' )
+	charValue = hexEscape | octEscape | charEscape | /[^\0\n\\]/
+	hexEscape = '\' ( "x" | "X" ) hexDigit hexDigit
+	octEscape = '\' octalDigit octalDigit octalDigit
+	charEscape = '\' ( "a" | "b" | "f" | "n" | "r" | "t" | "v" | '\' | "'" | '"' )
+
+
+
+	A oneof consists of oneof fields and a oneof name.
+
+	oneof = "oneof" oneofName "{" { oneofField | emptyStatement } "}"
+	oneofField = type fieldName "=" fieldNumber [ "[" fieldOptions "]" ] ";"
+	Example:
+
+	oneof foo {
+	    string name = 4;
+	    SubMessage sub_message = 9;
+	}
+	Map field
+
+	A map field has a key type, value type, name, and field number. The key type can be any integral or string type.
+
+	mapField = "map" "<" keyType "," type ">" mapName "=" fieldNumber [ "[" fieldOptions "]" ] ";"
+	keyType = "int32" | "int64" | "uint32" | "uint64" | "sint32" | "sint64" |
+		  "fixed32" | "fixed64" | "sfixed32" | "sfixed64" | "bool" | "string"
+	Example:
+
+	map<string, Project> projects = 3;
+	Reserved
+
+	Reserved statements declare a range of field numbers or field names that cannot be used in this message.
+
+	reserved = "reserved" ( ranges | fieldNames ) ";"
+	fieldNames = fieldName { "," fieldName }
+	Examples:
+
+	reserved 2, 15, 9 to 11;
+	reserved "foo", "bar";
+
+	Service definition
+
+	service = "service" serviceName "{" { option | rpc | stream | emptyStatement } "}"
+	rpc = "rpc" rpcName "(" [ "stream" ] messageType ")" "returns" "(" [ "stream" ]
+	messageType ")" (( "{" {option | emptyStatement } "}" ) | ";")
+	Example:
+
+	service SearchService {
+	  rpc Search (SearchRequest) returns (SearchResponse);
+	}
+
+*****************************************************)
