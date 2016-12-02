@@ -1,4 +1,4 @@
-﻿@@grammar :: Protobuf
+@@grammar :: Protobuf
 @@keyword :: true false option message
 (*
 
